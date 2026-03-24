@@ -14,6 +14,8 @@ export class GameAudio {
 		this.engineSound = null;
 		this.skidSound = null;
 		this.impactBuffer = null;
+		this.impactPool = [];
+		this.impactIndex = 0;
 		this.ready = false;
 		this.unlocked = false;
 
@@ -50,6 +52,14 @@ export class GameAudio {
 		loader.load( 'audio/impact.ogg', ( buffer ) => {
 
 			this.impactBuffer = buffer;
+
+			for ( let i = 0; i < 3; i ++ ) {
+
+				const sound = new THREE.Audio( this.listener );
+				sound.setBuffer( buffer );
+				this.impactPool.push( sound );
+
+			}
 
 		} );
 
@@ -143,12 +153,14 @@ export class GameAudio {
 
 	playImpact( impactVelocity ) {
 
-		if ( ! this.unlocked || ! this.impactBuffer ) return;
+		if ( ! this.unlocked || this.impactPool.length === 0 ) return;
+
+		const sound = this.impactPool[ this.impactIndex ];
+		this.impactIndex = ( this.impactIndex + 1 ) % this.impactPool.length;
+
+		if ( sound.isPlaying ) sound.stop();
 
 		const volume = THREE.MathUtils.clamp( remap( impactVelocity, 0, 6, 0.01, 1.0 ), 0.01, 1.0 );
-
-		const sound = new THREE.Audio( this.listener );
-		sound.setBuffer( this.impactBuffer );
 		sound.setVolume( volume );
 		sound.play();
 

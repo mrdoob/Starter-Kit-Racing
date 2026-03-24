@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
 const POOL_SIZE = 64;
+const _worldPos = new THREE.Vector3();
 
 export class SmokeTrails {
 
@@ -100,11 +101,10 @@ export class SmokeTrails {
 		this.emitIndex = ( this.emitIndex + 1 ) % POOL_SIZE;
 
 		// Get wheel world position, but use road surface Y
-		const worldPos = new THREE.Vector3();
-		wheel.getWorldPosition( worldPos );
-		worldPos.y = vehicle.container.position.y + 0.05;
+		wheel.getWorldPosition( _worldPos );
+		_worldPos.y = vehicle.container.position.y + 0.05;
 
-		p.sprite.position.copy( worldPos );
+		p.sprite.position.copy( _worldPos );
 		p.sprite.visible = true;
 		p.sprite.material.opacity = 0;
 

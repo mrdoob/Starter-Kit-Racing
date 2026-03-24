@@ -4,6 +4,10 @@ import { rigidBody } from 'crashcat';
 const _tmpVec = new THREE.Vector3();
 const _forward = new THREE.Vector3();
 const _right = new THREE.Vector3();
+const _zAxis = new THREE.Vector3();
+const _newZ = new THREE.Vector3();
+const _mat4 = new THREE.Matrix4();
+const _quat = new THREE.Quaternion();
 
 const SPEED_SCALE = 12.5;
 const LINEAR_DAMP = 0.1;
@@ -232,12 +236,12 @@ export class Vehicle {
 
 	alignWithY( quaternion, newY ) {
 
-		const zAxis = new THREE.Vector3( 0, 0, 1 ).applyQuaternion( quaternion );
-		const xAxis = _tmpVec.crossVectors( zAxis, newY ).negate().normalize();
-		const newZ = new THREE.Vector3().crossVectors( xAxis, newY ).normalize();
+		_zAxis.set( 0, 0, 1 ).applyQuaternion( quaternion );
+		const xAxis = _tmpVec.crossVectors( _zAxis, newY ).negate().normalize();
+		_newZ.crossVectors( xAxis, newY ).normalize();
 
-		const m = new THREE.Matrix4().makeBasis( xAxis, newY, newZ );
-		return new THREE.Quaternion().setFromRotationMatrix( m );
+		_mat4.makeBasis( xAxis, newY, _newZ );
+		return _quat.setFromRotationMatrix( _mat4 );
 
 	}
 
