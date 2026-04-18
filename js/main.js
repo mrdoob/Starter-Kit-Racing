@@ -10,6 +10,7 @@ import { Controls } from './Controls.js';
 import { buildTrack, decodeCells, computeSpawnPosition, computeTrackBounds } from './Track.js';
 import { buildWallColliders, createSphereBody } from './Physics.js';
 import { SmokeTrails } from './Particles.js';
+import { spawnBalls } from './Balls.js';
 import { GameAudio } from './Audio.js';
 
 
@@ -184,6 +185,8 @@ async function init() {
 		restitution: 0.0,
 	} );
 
+	const balls = spawnBalls( scene, world, bounds );
+
 	const sphereBody = createSphereBody( world, spawn ? spawn.position : null );
 
 	const vehicle = new Vehicle();
@@ -253,6 +256,7 @@ async function init() {
 		);
 
 		cam.update( dt, vehicle.spherePos );
+		balls.update();
 		particles.update( dt, vehicle );
 		audio.update( dt, vehicle.linearSpeed, input.z, vehicle.driftIntensity );
 
