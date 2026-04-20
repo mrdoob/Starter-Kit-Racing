@@ -53,6 +53,20 @@ export class Vehicle {
 
 		this.driftIntensity = 0;
 
+		this.stunTimer = 0;
+		this.stunDuration = 0;
+		this.stunSpinVel = 0;
+		this.stunHopVel = 0;
+
+	}
+
+	stun( duration = 2.2, spinVel = 24 ) {
+
+		this.stunTimer = Math.max( this.stunTimer, duration );
+		this.stunDuration = Math.max( this.stunDuration, duration );
+		this.stunSpinVel = spinVel * ( Math.random() < 0.5 ? - 1 : 1 );
+		this.stunHopVel = 5.5;
+
 	}
 
 	init( model ) {
@@ -97,6 +111,38 @@ export class Vehicle {
 	}
 
 	update( dt, controlsInput ) {
+
+		if ( this.stunTimer > 0 ) {
+
+			this.stunTimer = Math.max( 0, this.stunTimer - dt );
+			this.container.rotateY( this.stunSpinVel * dt );
+			this.stunSpinVel *= Math.max( 0, 1 - 0.55 * dt );
+			this.linearSpeed *= Math.max( 0, 1 - 3.0 * dt );
+			this.angularSpeed = 0;
+			this.inputX = 0;
+			this.inputZ = 0;
+
+			// Dramatic tilt + hop on the body node
+			if ( this.bodyNode ) {
+
+				const t = this.stunDuration > 0 ? ( this.stunTimer / this.stunDuration ) : 0;
+				const phase = this.stunTimer * 10;
+				this.bodyNode.rotation.z = Math.sin( phase ) * 0.5 * t;
+				this.bodyNode.rotation.x = Math.cos( phase * 0.6 ) * 0.35 * t;
+				this.stunHopVel -= 18 * dt;
+				this.bodyNode.position.y += this.stunHopVel * dt;
+				if ( this.bodyNode.position.y < 0.3 ) {
+
+					this.bodyNode.position.y = 0.3;
+					if ( this.stunHopVel < 0 ) this.stunHopVel *= - 0.35;
+
+				}
+
+			}
+
+			controlsInput = { x: 0, z: 0, touchActive: false, fire: false };
+
+		}
 
 		this.inputX = controlsInput.x;
 		this.inputZ = controlsInput.z;
