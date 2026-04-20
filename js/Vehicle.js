@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { rigidBody } from 'crashcat';
+import { rigidBody, MotionType } from 'crashcat';
 
 const _tmpVec = new THREE.Vector3();
 const _forward = new THREE.Vector3();
@@ -9,6 +9,8 @@ const _newZ = new THREE.Vector3();
 const _mat4 = new THREE.Matrix4();
 const _quat = new THREE.Quaternion();
 const _up = new THREE.Vector3( 0, 1, 0 );
+const _arcA = new THREE.Vector3();
+const _arcB = new THREE.Vector3();
 
 const SPEED_SCALE = 12.5;
 const LINEAR_DAMP = 0.1;
@@ -58,10 +60,96 @@ export class Vehicle {
 		this.stunSpinVel = 0;
 		this.stunHopVel = 0;
 
+		// --- Transformer-mode state ---
+		this.transformProgress = 0;
+		this.transformTarget = 0;
+		this.transformForwardSpeed = 1 / 0.9;
+		this.transformReverseSpeed = 1 / 0.7;
+		this.currentDirection = 0; // +1 forward, -1 reverse, 0 idle
+		this.stageFlags = {};
+
+		this.turretYaw = 0;
+		this.turretPitch = 0;
+		this.turretPitchTarget = 0;
+
+		this.robot = null;
+		this.transformFX = null;
+		this.audio = null;
+		this.hitFX = null;
+
+		this.kinematicActive = false;
+		this.pinnedPos = [ 3.5, 0.5, 5 ];
+
+		this.shakeAmplitude = 0;
+
+		this._wheelOriginalY = null; // captured on init
+
+	}
+
+	attachRobot( robot, transformFX, audio, hitFX ) {
+
+		this.robot = robot;
+		this.transformFX = transformFX;
+		this.audio = audio;
+		this.hitFX = hitFX;
+		this.container.add( robot.getRoot() );
+
+	}
+
+	toggleTransform() {
+
+		if ( this.stunTimer > 0 ) return;
+		if ( ! this.robot ) return;
+
+		const goingForward = this.transformTarget < 0.5;
+		this.transformTarget = goingForward ? 1 : 0;
+		this.currentDirection = goingForward ? 1 : - 1;
+		this.stageFlags = {};
+
+		if ( goingForward && ! this.kinematicActive && this.rigidBody ) {
+
+			this.pinnedPos = [ this.spherePos.x, this.spherePos.y, this.spherePos.z ];
+			rigidBody.setMotionType( this.physicsWorld, this.rigidBody, MotionType.KINEMATIC );
+			rigidBody.setLinearVelocity( this.physicsWorld, this.rigidBody, [ 0, 0, 0 ] );
+			rigidBody.setAngularVelocity( this.physicsWorld, this.rigidBody, [ 0, 0, 0 ] );
+			this.kinematicActive = true;
+			this.linearSpeed = 0;
+			this.angularSpeed = 0;
+			this.acceleration = 0;
+			if ( this.audio ) this.audio.playImpact( 3 );
+
+		}
+
+	}
+
+	isTransformed() {
+
+		return this.transformProgress >= 0.98;
+
+	}
+
+	isTransforming() {
+
+		return ( this.transformProgress > 0.001 && this.transformProgress < 0.98 ) || this.transformTarget !== ( this.isTransformed() ? 1 : 0 );
+
+	}
+
+	_checkPhaseCross( threshold, flagName, fn ) {
+
+		if ( this.currentDirection !== 1 ) return;
+		if ( this.stageFlags[ flagName ] ) return;
+		if ( this.transformProgress >= threshold ) {
+
+			this.stageFlags[ flagName ] = true;
+			fn();
+
+		}
+
 	}
 
 	stun( duration = 2.2, spinVel = 24 ) {
 
+		if ( this.transformProgress > 0.01 || this.transformTarget > 0.01 ) return;
 		this.stunTimer = Math.max( this.stunTimer, duration );
 		this.stunDuration = Math.max( this.stunDuration, duration );
 		this.stunSpinVel = spinVel * ( Math.random() < 0.5 ? - 1 : 1 );
@@ -111,6 +199,142 @@ export class Vehicle {
 	}
 
 	update( dt, controlsInput ) {
+
+		// --- Transformer mode: animation + phase FX + frozen physics ---
+		const transformActive = this.transformProgress > 0.001 || this.transformTarget > 0.001;
+		if ( transformActive ) {
+
+			const speed = this.currentDirection >= 0 ? this.transformForwardSpeed : this.transformReverseSpeed;
+			if ( this.transformProgress < this.transformTarget ) {
+
+				this.transformProgress = Math.min( this.transformTarget, this.transformProgress + speed * dt );
+
+			} else if ( this.transformProgress > this.transformTarget ) {
+
+				this.transformProgress = Math.max( this.transformTarget, this.transformProgress - speed * dt );
+
+			}
+
+			if ( this.robot ) this.robot.setProgress( this.transformProgress );
+
+			const px = this.pinnedPos[ 0 ];
+			const py = this.pinnedPos[ 1 ];
+			const pz = this.pinnedPos[ 2 ];
+
+			if ( this.transformFX && this.audio ) {
+
+				this._checkPhaseCross( 0.10, 'p1', () => {
+
+					this.transformFX.shockwave( px, py - 0.5, pz, 2.2 );
+					this.transformFX.steamBurst( px - 0.8, py - 0.5, pz, 3 );
+					this.transformFX.steamBurst( px + 0.8, py - 0.5, pz, 3 );
+					this.audio.playImpact( 4 );
+					this.shakeAmplitude = Math.max( this.shakeAmplitude, 0.08 );
+
+				} );
+
+				this._checkPhaseCross( 0.42, 'p2', () => {
+
+					_arcA.set( px - 0.5, py + 0.4, pz );
+					_arcB.set( px + 0.5, py + 0.4, pz );
+					this.transformFX.arc( _arcA, _arcB );
+					_arcA.set( px, py + 0.2, pz - 0.3 );
+					_arcB.set( px, py + 0.9, pz + 0.3 );
+					this.transformFX.arc( _arcA, _arcB );
+					this.audio.playImpact( 2 );
+					this.shakeAmplitude = Math.max( this.shakeAmplitude, 0.05 );
+
+				} );
+
+				this._checkPhaseCross( 0.62, 'p3', () => {
+
+					this.transformFX.steamBurst( px, py + 0.9, pz, 3 );
+					this.transformFX.flash( 0.12 );
+					this.audio.playImpact( 3 );
+					this.shakeAmplitude = Math.max( this.shakeAmplitude, 0.06 );
+
+				} );
+
+				this._checkPhaseCross( 0.92, 'p4', () => {
+
+					this.transformFX.shockwave( px, py - 0.5, pz, 5 );
+					this.transformFX.flash( 0.18 );
+					if ( this.hitFX ) this.hitFX.burst( px, py + 0.5, pz );
+					this.audio.playImpact( 5 );
+					this.shakeAmplitude = Math.max( this.shakeAmplitude, 0.1 );
+
+				} );
+
+			}
+
+			this.shakeAmplitude *= Math.max( 0, 1 - dt * 6 );
+
+			// Hide wheels and raise body as transform progresses
+			const hidden = this.transformProgress > 0.15;
+			for ( const wheel of this.wheels ) wheel.visible = ! hidden;
+			if ( this.bodyNode ) {
+
+				this.bodyNode.position.y = 0.3 + this.transformProgress * 0.45;
+				if ( this.transformProgress > 0.08 ) {
+
+					this.bodyNode.rotation.x *= Math.max( 0, 1 - dt * 8 );
+					this.bodyNode.rotation.z *= Math.max( 0, 1 - dt * 8 );
+
+				}
+
+			}
+
+			// Turret input — only when fully transformed
+			if ( this.isTransformed() ) {
+
+				this.turretYaw -= ( controlsInput.x || 0 ) * 2.5 * dt;
+				this.turretPitchTarget = ( controlsInput.z || 0 ) * 0.25;
+
+			} else {
+
+				this.turretPitchTarget = 0;
+
+			}
+			this.turretPitch = THREE.MathUtils.lerp( this.turretPitch, this.turretPitchTarget, Math.min( 1, dt * 5 ) );
+			if ( this.robot ) {
+
+				this.robot.setTurretYaw( this.turretYaw );
+				this.robot.setTurretPitch( this.turretPitch );
+				this.robot.update( dt );
+
+			}
+
+			// Pin body while kinematic
+			if ( this.kinematicActive && this.rigidBody ) {
+
+				rigidBody.setPosition( this.physicsWorld, this.rigidBody, this.pinnedPos, false );
+				rigidBody.setLinearVelocity( this.physicsWorld, this.rigidBody, [ 0, 0, 0 ] );
+				rigidBody.setAngularVelocity( this.physicsWorld, this.rigidBody, [ 0, 0, 0 ] );
+
+			}
+
+			// Update container visual position (pinned body)
+			this.spherePos.set( px, py, pz );
+			this.container.position.set( px, py - 0.5, pz );
+			this.prevModelPos.copy( this.container.position );
+			this.modelVelocity.set( 0, 0, 0 );
+
+			// Exit kinematic when fully reversed
+			if ( this.transformProgress <= 0.001 && this.kinematicActive && this.rigidBody ) {
+
+				rigidBody.setMotionType( this.physicsWorld, this.rigidBody, MotionType.DYNAMIC );
+				this.kinematicActive = false;
+				this.currentDirection = 0;
+				this.transformProgress = 0;
+				if ( this.robot ) this.robot.setProgress( 0 );
+				// Restore wheel visibility
+				for ( const wheel of this.wheels ) wheel.visible = true;
+
+			}
+
+			return;
+
+		}
 
 		if ( this.stunTimer > 0 ) {
 

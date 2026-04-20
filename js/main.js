@@ -15,6 +15,9 @@ import { GameAudio } from './Audio.js';
 import { Shell } from './Shell.js';
 import { createNPCs } from './NPC.js';
 import { HitFX } from './HitFX.js';
+import { Robot } from './Robot.js';
+import { TransformFX } from './TransformFX.js';
+import { MuzzleFlash } from './MuzzleFlash.js';
 
 
 const renderer = new THREE.WebGLRenderer( { antialias: true, outputBufferType: THREE.HalfFloatType } );
@@ -233,15 +236,25 @@ async function init() {
 	const particles = new SmokeTrails( scene );
 	const driftMarks = new DriftMarks( scene );
 	const hitFX = new HitFX( scene );
+	const transformFX = new TransformFX( scene );
+	const muzzleFlash = new MuzzleFlash( scene );
 
 	const audio = new GameAudio();
 	audio.init( cam.camera );
 
+	const robot = new Robot();
+	vehicle.attachRobot( robot, transformFX, audio, hitFX );
+
 	const _forward = new THREE.Vector3();
+	const _cannonPos = new THREE.Vector3();
+	const _cannonDir = new THREE.Vector3();
 	const shells = [];
 	let shellCooldown = 0;
+	let cannonSide = 0;
 	const MAX_ACTIVE_SHELLS = 3;
 	const SHELL_COOLDOWN = 1.5;
+	const ROBOT_MAX_SHELLS = 12;
+	const ROBOT_COOLDOWN = 0.12;
 
 	const contactListener = {
 		onContactAdded( bodyA, bodyB ) {
@@ -281,23 +294,49 @@ async function init() {
 
 		updateWorld( world, contactListener, dt );
 
+		if ( input.transform ) vehicle.toggleTransform();
+
 		vehicle.update( dt, input );
 
 		shellCooldown = Math.max( 0, shellCooldown - dt );
 
-		if ( input.fire && shellCooldown === 0 && shells.length < MAX_ACTIVE_SHELLS ) {
+		const transformed = vehicle.isTransformed();
+		const transforming = vehicle.isTransforming();
+		const cooldown = transformed ? ROBOT_COOLDOWN : SHELL_COOLDOWN;
+		const maxShells = transformed ? ROBOT_MAX_SHELLS : MAX_ACTIVE_SHELLS;
 
-			_forward.set( 0, 0, 1 ).applyQuaternion( vehicle.container.quaternion );
-			_forward.y = 0;
-			_forward.normalize();
+		if ( input.fire && ! transforming && shellCooldown === 0 && shells.length < maxShells ) {
 
-			shells.push( new Shell( world, scene, {
-				position: vehicle.spherePos,
-				direction: _forward,
-				ownerBody: sphereBody,
-			} ) );
+			if ( transformed ) {
 
-			shellCooldown = SHELL_COOLDOWN;
+				const side = cannonSide === 0 ? 'left' : 'right';
+				cannonSide = 1 - cannonSide;
+				robot.getCannonTransform( side, _cannonPos, _cannonDir );
+
+				shells.push( new Shell( world, scene, {
+					position: _cannonPos,
+					direction: _cannonDir,
+					ownerBody: sphereBody,
+				} ) );
+
+				muzzleFlash.burst( _cannonPos.x, _cannonPos.y, _cannonPos.z );
+				robot.onShotFired( side );
+
+			} else {
+
+				_forward.set( 0, 0, 1 ).applyQuaternion( vehicle.container.quaternion );
+				_forward.y = 0;
+				_forward.normalize();
+
+				shells.push( new Shell( world, scene, {
+					position: vehicle.spherePos,
+					direction: _forward,
+					ownerBody: sphereBody,
+				} ) );
+
+			}
+
+			shellCooldown = cooldown;
 
 		}
 
@@ -326,6 +365,17 @@ async function init() {
 		particles.update( dt, vehicle );
 		driftMarks.update( dt, vehicle );
 		hitFX.update( dt );
+		transformFX.update( dt, cam.camera );
+		muzzleFlash.update( dt, cam.camera.quaternion );
+
+		if ( vehicle.shakeAmplitude > 0.001 ) {
+
+			const a = vehicle.shakeAmplitude;
+			cam.camera.position.x += ( Math.random() - 0.5 ) * 2 * a;
+			cam.camera.position.y += ( Math.random() - 0.5 ) * 2 * a;
+			cam.camera.position.z += ( Math.random() - 0.5 ) * 2 * a;
+
+		}
 		audio.update( dt, vehicle.linearSpeed / MAX_SPEED, input.z, vehicle.driftIntensity );
 
 		renderer.render( scene, cam.camera );

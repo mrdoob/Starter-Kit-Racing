@@ -8,6 +8,8 @@ export class Controls {
 
 		this.prevSpace = false;
 		this.prevGamepadFire = false;
+		this.prevT = false;
+		this.prevGamepadTransform = false;
 
 		// Touch state
 		this.touchActive = false;
@@ -119,6 +121,10 @@ export class Controls {
 		let fire = spaceDown && ! this.prevSpace;
 		this.prevSpace = spaceDown;
 
+		const tDown = !! this.keys[ 'KeyT' ];
+		let transform = tDown && ! this.prevT;
+		this.prevT = tDown;
+
 		// Gamepad
 
 		const gamepads = navigator.getGamepads();
@@ -138,6 +144,10 @@ export class Controls {
 			const gpFire = gp.buttons[ 0 ] ? !! gp.buttons[ 0 ].pressed : false;
 			if ( gpFire && ! this.prevGamepadFire ) fire = true;
 			this.prevGamepadFire = gpFire;
+
+			const gpTransform = gp.buttons[ 1 ] ? !! gp.buttons[ 1 ].pressed : false;
+			if ( gpTransform && ! this.prevGamepadTransform ) transform = true;
+			this.prevGamepadTransform = gpTransform;
 
 			break;
 
@@ -163,7 +173,7 @@ export class Controls {
 		this.x = x;
 		this.z = z;
 
-		return { x, z, touchActive: this.touchActive, fire };
+		return { x, z, touchActive: this.touchActive, fire, transform };
 
 	}
 
