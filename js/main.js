@@ -7,11 +7,17 @@ import { createWorldSettings, createWorld, addBroadphaseLayer, addObjectLayer, e
 import { Vehicle, MAX_SPEED } from './Vehicle.js';
 import { Camera } from './Camera.js';
 import { Controls } from './Controls.js';
-import { buildTrack, decodeCells, computeSpawnPosition, computeTrackBounds } from './Track.js';
+import { buildTrack, decodeCells, computeSpawnPosition, computeTrackBounds, NPC_TRUCKS } from './Track.js';
 import { buildWallColliders, createSphereBody } from './Physics.js';
 import { SmokeTrails } from './Particles.js';
 import { DriftMarks } from './DriftMarks.js';
 import { GameAudio } from './Audio.js';
+import { Shell } from './Shell.js';
+import { createNPCs } from './NPC.js';
+import { HitFX } from './HitFX.js';
+import { Robot } from './Robot.js';
+import { TransformFX } from './TransformFX.js';
+import { MuzzleFlash } from './MuzzleFlash.js';
 
 
 const renderer = new THREE.WebGLRenderer( { antialias: true, outputBufferType: THREE.HalfFloatType } );
@@ -188,6 +194,10 @@ async function init() {
 
 	buildWallColliders( world, null, customCells );
 
+	const { npcs, bodyToNPC } = customCells
+		? { npcs: [], bodyToNPC: new Map() }
+		: createNPCs( world, scene, models, NPC_TRUCKS );
+
 	const roadHalf = groundSize / 2;
 	rigidBody.create( world, {
 		shape: box.create( { halfExtents: [ roadHalf, 0.01, roadHalf ] } ),
@@ -225,23 +235,48 @@ async function init() {
 
 	const particles = new SmokeTrails( scene );
 	const driftMarks = new DriftMarks( scene );
+	const hitFX = new HitFX( scene );
+	const transformFX = new TransformFX( scene );
+	const muzzleFlash = new MuzzleFlash( scene );
 
 	const audio = new GameAudio();
 	audio.init( cam.camera );
 
+	const robot = new Robot();
+	vehicle.attachRobot( robot, transformFX, audio, hitFX );
+
 	const _forward = new THREE.Vector3();
+	const _cannonPos = new THREE.Vector3();
+	const _cannonDir = new THREE.Vector3();
+	const shells = [];
+	let shellCooldown = 0;
+	let cannonSide = 0;
+	const MAX_ACTIVE_SHELLS = 3;
+	const SHELL_COOLDOWN = 1.5;
+	const ROBOT_MAX_SHELLS = 24;
+	const ROBOT_COOLDOWN = 0.12;
 
 	const contactListener = {
 		onContactAdded( bodyA, bodyB ) {
 
-			if ( bodyA !== sphereBody && bodyB !== sphereBody ) return;
+			if ( bodyA === sphereBody || bodyB === sphereBody ) {
 
-			_forward.set( 0, 0, 1 ).applyQuaternion( vehicle.container.quaternion );
-			_forward.y = 0;
-			_forward.normalize();
+				_forward.set( 0, 0, 1 ).applyQuaternion( vehicle.container.quaternion );
+				_forward.y = 0;
+				_forward.normalize();
 
-			const impactVelocity = Math.abs( vehicle.modelVelocity.dot( _forward ) );
-			audio.playImpact( impactVelocity );
+				const impactVelocity = Math.abs( vehicle.modelVelocity.dot( _forward ) );
+				audio.playImpact( impactVelocity );
+
+			}
+
+			for ( const shell of shells ) {
+
+				if ( ! shell.alive ) continue;
+				if ( shell.body === bodyA ) shell.onContact( bodyB, bodyToNPC, vehicle, hitFX );
+				else if ( shell.body === bodyB ) shell.onContact( bodyA, bodyToNPC, vehicle, hitFX );
+
+			}
 
 		}
 	};
@@ -259,7 +294,67 @@ async function init() {
 
 		updateWorld( world, contactListener, dt );
 
+		if ( input.transform ) vehicle.toggleTransform();
+
 		vehicle.update( dt, input );
+
+		shellCooldown = Math.max( 0, shellCooldown - dt );
+
+		const transformed = vehicle.isTransformed();
+		const transforming = vehicle.isTransforming();
+		const cooldown = transformed ? ROBOT_COOLDOWN : SHELL_COOLDOWN;
+		const maxShells = transformed ? ROBOT_MAX_SHELLS : MAX_ACTIVE_SHELLS;
+
+		if ( input.fire && ! transforming && shellCooldown === 0 && shells.length < maxShells ) {
+
+			if ( transformed ) {
+
+				const side = cannonSide === 0 ? 'left' : 'right';
+				cannonSide = 1 - cannonSide;
+				robot.getCannonTransform( side, _cannonPos, _cannonDir );
+
+				shells.push( new Shell( world, scene, {
+					position: _cannonPos,
+					direction: _cannonDir,
+					ownerBody: sphereBody,
+					power: 1.4,
+				} ) );
+
+				muzzleFlash.burst( _cannonPos.x, _cannonPos.y, _cannonPos.z );
+				robot.onShotFired( side );
+
+			} else {
+
+				_forward.set( 0, 0, 1 ).applyQuaternion( vehicle.container.quaternion );
+				_forward.y = 0;
+				_forward.normalize();
+
+				shells.push( new Shell( world, scene, {
+					position: vehicle.spherePos,
+					direction: _forward,
+					ownerBody: sphereBody,
+				} ) );
+
+			}
+
+			shellCooldown = cooldown;
+
+		}
+
+		for ( const shell of shells ) shell.update( dt );
+
+		for ( let i = shells.length - 1; i >= 0; i -- ) {
+
+			if ( ! shells[ i ].alive ) {
+
+				shells[ i ].destroy();
+				shells.splice( i, 1 );
+
+			}
+
+		}
+
+		for ( const npc of npcs ) npc.update( dt );
 
 		dirLight.position.set(
 			vehicle.spherePos.x + 11.4,
@@ -270,6 +365,18 @@ async function init() {
 		cam.update( dt, vehicle.spherePos );
 		particles.update( dt, vehicle );
 		driftMarks.update( dt, vehicle );
+		hitFX.update( dt );
+		transformFX.update( dt, cam.camera );
+		muzzleFlash.update( dt, cam.camera.quaternion );
+
+		if ( vehicle.shakeAmplitude > 0.001 ) {
+
+			const a = vehicle.shakeAmplitude;
+			cam.camera.position.x += ( Math.random() - 0.5 ) * 2 * a;
+			cam.camera.position.y += ( Math.random() - 0.5 ) * 2 * a;
+			cam.camera.position.z += ( Math.random() - 0.5 ) * 2 * a;
+
+		}
 		audio.update( dt, vehicle.linearSpeed / MAX_SPEED, input.z, vehicle.driftIntensity );
 
 		renderer.render( scene, cam.camera );
