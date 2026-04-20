@@ -106,17 +106,25 @@ export class Vehicle {
 		this.currentDirection = goingForward ? 1 : - 1;
 		this.stageFlags = {};
 
-		if ( goingForward && ! this.kinematicActive && this.rigidBody ) {
+		if ( goingForward ) {
 
-			this.pinnedPos = [ this.spherePos.x, this.spherePos.y, this.spherePos.z ];
-			rigidBody.setMotionType( this.physicsWorld, this.rigidBody, MotionType.KINEMATIC );
-			rigidBody.setLinearVelocity( this.physicsWorld, this.rigidBody, [ 0, 0, 0 ] );
-			rigidBody.setAngularVelocity( this.physicsWorld, this.rigidBody, [ 0, 0, 0 ] );
-			this.kinematicActive = true;
-			this.linearSpeed = 0;
-			this.angularSpeed = 0;
-			this.acceleration = 0;
-			if ( this.audio ) this.audio.playImpact( 3 );
+			this.turretYaw = 0;
+			this.turretPitch = 0;
+			this.turretPitchTarget = 0;
+
+			if ( ! this.kinematicActive && this.rigidBody ) {
+
+				this.pinnedPos = [ this.spherePos.x, this.spherePos.y, this.spherePos.z ];
+				rigidBody.setMotionType( this.physicsWorld, this.rigidBody, MotionType.KINEMATIC );
+				rigidBody.setLinearVelocity( this.physicsWorld, this.rigidBody, [ 0, 0, 0 ] );
+				rigidBody.setAngularVelocity( this.physicsWorld, this.rigidBody, [ 0, 0, 0 ] );
+				this.kinematicActive = true;
+				this.linearSpeed = 0;
+				this.angularSpeed = 0;
+				this.acceleration = 0;
+				if ( this.audio ) this.audio.playImpact( 3 );
+
+			}
 
 		}
 
