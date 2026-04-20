@@ -302,7 +302,7 @@ export class Vehicle {
 			// Turret input — only when fully transformed
 			if ( this.isTransformed() ) {
 
-				this.turretYaw -= ( controlsInput.x || 0 ) * 2.5 * dt;
+				this.turretYaw -= ( controlsInput.x || 0 ) * 5.0 * dt;
 				this.turretPitchTarget = ( controlsInput.z || 0 ) * 0.25;
 
 			} else {

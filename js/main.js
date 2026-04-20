@@ -253,7 +253,7 @@ async function init() {
 	let cannonSide = 0;
 	const MAX_ACTIVE_SHELLS = 3;
 	const SHELL_COOLDOWN = 1.5;
-	const ROBOT_MAX_SHELLS = 12;
+	const ROBOT_MAX_SHELLS = 24;
 	const ROBOT_COOLDOWN = 0.12;
 
 	const contactListener = {
