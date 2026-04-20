@@ -60,11 +60,12 @@ function buildShellMesh() {
 
 export class Shell {
 
-	constructor( world, scene, { position, direction, ownerBody } ) {
+	constructor( world, scene, { position, direction, ownerBody, power = 1 } ) {
 
 		this.world = world;
 		this.scene = scene;
 		this.ownerBody = ownerBody;
+		this.power = power;
 		this.alive = true;
 		this.lifetime = SHELL_LIFETIME;
 		this.ignoreOwnerTimer = SHELL_IGNORE_OWNER;
@@ -154,12 +155,22 @@ export class Shell {
 
 	}
 
+	_buildImpact() {
+
+		const vel = this.body.motionProperties.linearVelocity;
+		const mag = Math.hypot( vel[ 0 ], vel[ 2 ] );
+		const dirX = mag > 0.01 ? vel[ 0 ] / mag : 0;
+		const dirZ = mag > 0.01 ? vel[ 2 ] / mag : 1;
+		return { dirX, dirZ, power: this.power };
+
+	}
+
 	onContact( otherBody, bodyToNPC, vehicle, hitFX ) {
 
 		if ( otherBody === this.ownerBody ) {
 
 			if ( this.ignoreOwnerTimer > 0 ) return;
-			if ( vehicle ) vehicle.stun();
+			if ( vehicle ) vehicle.stun( this._buildImpact() );
 			if ( hitFX ) {
 
 				const p = this.body.position;
@@ -174,7 +185,7 @@ export class Shell {
 		const npc = bodyToNPC.get( otherBody );
 		if ( npc ) {
 
-			npc.hit();
+			npc.hit( this._buildImpact() );
 			if ( hitFX ) {
 
 				const p = this.body.position;

@@ -147,13 +147,28 @@ export class Vehicle {
 
 	}
 
-	stun( duration = 2.2, spinVel = 24 ) {
+	stun( impact = null ) {
 
 		if ( this.transformProgress > 0.01 || this.transformTarget > 0.01 ) return;
+		const power = impact ? impact.power : 1;
+		const duration = 2.2 * power;
+		const spinVel = 24 * power;
 		this.stunTimer = Math.max( this.stunTimer, duration );
 		this.stunDuration = Math.max( this.stunDuration, duration );
 		this.stunSpinVel = spinVel * ( Math.random() < 0.5 ? - 1 : 1 );
-		this.stunHopVel = 5.5;
+		this.stunHopVel = 5.5 * ( 0.7 + 0.3 * power );
+
+		if ( impact && this.rigidBody ) {
+
+			const impulse = 8 * power;
+			const vel = this.rigidBody.motionProperties.linearVelocity;
+			rigidBody.setLinearVelocity( this.physicsWorld, this.rigidBody, [
+				vel[ 0 ] + impact.dirX * impulse,
+				vel[ 1 ] + 3 * power,
+				vel[ 2 ] + impact.dirZ * impulse,
+			] );
+
+		}
 
 	}
 

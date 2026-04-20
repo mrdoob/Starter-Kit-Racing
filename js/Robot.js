@@ -15,10 +15,10 @@ const easeOutBack = ( t ) => {
 
 };
 
-// --- Shared materials (draw-call friendly) ---
-const chromeMat = new THREE.MeshStandardMaterial( { color: 0x2a2f3a, metalness: 0.85, roughness: 0.3 } );
-const darkPanelMat = new THREE.MeshStandardMaterial( { color: 0x181b22, metalness: 0.4, roughness: 0.55 } );
-const yellowMat = new THREE.MeshStandardMaterial( { color: 0xf2c32c, metalness: 0.2, roughness: 0.5, emissive: 0x553d00, emissiveIntensity: 0.25 } );
+// --- Shared materials (draw-call friendly). Body color matches the yellow truck. ---
+const chromeMat = new THREE.MeshStandardMaterial( { color: 0xf2c32c, metalness: 0.35, roughness: 0.45 } );
+const darkPanelMat = new THREE.MeshStandardMaterial( { color: 0x25282f, metalness: 0.55, roughness: 0.45 } );
+const yellowMat = new THREE.MeshStandardMaterial( { color: 0xd89418, metalness: 0.3, roughness: 0.45, emissive: 0x3a2600, emissiveIntensity: 0.2 } );
 const redEmissiveMat = new THREE.MeshStandardMaterial( { color: 0xff2a1a, emissive: 0xff2010, emissiveIntensity: 0, roughness: 0.25, metalness: 0.1 } );
 const blueCoreMat = new THREE.MeshStandardMaterial( { color: 0x33aaff, emissive: 0x2088ff, emissiveIntensity: 1.2, roughness: 0.2, metalness: 0.1 } );
 const muzzleGlowMat = new THREE.MeshStandardMaterial( { color: 0xff9840, emissive: 0xff5a10, emissiveIntensity: 0.6, roughness: 0.3 } );

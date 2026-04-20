@@ -8,6 +8,8 @@ const SPIN_DECAY = 0.45;
 const HIT_HOP_VEL = 5.5;
 const HIT_GRAVITY = 18;
 const HIT_TILT = 0.35;
+const KNOCKBACK_VEL = 5.5;
+const KNOCKBACK_DECAY = 2.3;
 const ARRIVAL_DIST_SQ = 4.0;
 const DEFAULT_SPEED = 5.5;
 const ROT_LERP = 5;
@@ -96,15 +98,24 @@ export class NPC {
 		this.hitTimer = 0;
 		this.spinVel = 0;
 		this.hopVel = 0;
+		this.knockVx = 0;
+		this.knockVz = 0;
 		this.baseY = y;
 
 	}
 
-	hit() {
+	hit( impact = null ) {
 
-		this.hitTimer = HIT_DURATION;
-		this.spinVel = HIT_SPIN_VEL * ( Math.random() < 0.5 ? - 1 : 1 );
-		this.hopVel = HIT_HOP_VEL;
+		const power = impact ? impact.power : 1;
+		this.hitTimer = HIT_DURATION * power;
+		this.spinVel = HIT_SPIN_VEL * power * ( Math.random() < 0.5 ? - 1 : 1 );
+		this.hopVel = HIT_HOP_VEL * ( 0.7 + 0.3 * power );
+		if ( impact ) {
+
+			this.knockVx = impact.dirX * KNOCKBACK_VEL * power;
+			this.knockVz = impact.dirZ * KNOCKBACK_VEL * power;
+
+		}
 
 	}
 
@@ -125,12 +136,29 @@ export class NPC {
 
 			}
 
+			// Knockback slide — carries the truck in the impact direction
+			if ( this.knockVx !== 0 || this.knockVz !== 0 ) {
+
+				this.mesh.position.x += this.knockVx * dt;
+				this.mesh.position.z += this.knockVz * dt;
+				const decay = Math.max( 0, 1 - KNOCKBACK_DECAY * dt );
+				this.knockVx *= decay;
+				this.knockVz *= decay;
+				rigidBody.setPosition( this.world, this.body, [
+					this.mesh.position.x, this.bodyY, this.mesh.position.z,
+				], false );
+
+			}
+
 			const tiltPhase = this.hitTimer * 9;
 			this.mesh.rotation.z = Math.sin( tiltPhase ) * HIT_TILT * ( this.hitTimer / HIT_DURATION );
 			this.mesh.rotation.x = Math.cos( tiltPhase * 0.7 ) * HIT_TILT * 0.5 * ( this.hitTimer / HIT_DURATION );
 			return;
 
 		}
+
+		this.knockVx = 0;
+		this.knockVz = 0;
 
 		if ( this.mesh.rotation.z !== 0 || this.mesh.rotation.x !== 0 ) {
 

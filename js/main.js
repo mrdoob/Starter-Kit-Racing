@@ -317,6 +317,7 @@ async function init() {
 					position: _cannonPos,
 					direction: _cannonDir,
 					ownerBody: sphereBody,
+					power: 1.4,
 				} ) );
 
 				muzzleFlash.burst( _cannonPos.x, _cannonPos.y, _cannonPos.z );
