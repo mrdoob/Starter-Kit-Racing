@@ -38,6 +38,9 @@ export class GameAudio {
 		this.gear = 0;
 		this.shiftCooldown = 0;
 
+		this.nosWhoosh = null;
+		this.prevNosActive = false;
+
 	}
 
 	init( camera ) {
@@ -49,6 +52,7 @@ export class GameAudio {
 
 		this.engineSound = new THREE.Audio( this.listener );
 		this.engineLayerSound = new THREE.Audio( this.listener );
+		this.nosWhoosh = new THREE.Audio( this.listener );
 
 		this.engineFilter = this.listener.context.createBiquadFilter();
 		this.engineFilter.type = 'lowpass';
@@ -67,6 +71,9 @@ export class GameAudio {
 			this.engineLayerSound.setBuffer( buffer );
 			this.engineLayerSound.setLoop( true );
 			this.engineLayerSound.setVolume( 0 );
+
+			this.nosWhoosh.setBuffer( buffer );
+			this.nosWhoosh.setLoop( false );
 
 			this.checkReady();
 
@@ -144,9 +151,22 @@ export class GameAudio {
 
 	}
 
-	update( dt, speed, throttle, driftIntensity ) {
+	update( dt, speed, throttle, driftIntensity, nosActive ) {
 
 		if ( ! this.ready ) return;
+
+		const na = nosActive === true;
+		if ( na && ! this.prevNosActive && this.nosWhoosh && this.nosWhoosh.buffer ) {
+
+			if ( this.nosWhoosh.isPlaying ) this.nosWhoosh.stop();
+
+			this.nosWhoosh.setPlaybackRate( 1.55 + Math.random() * 0.25 );
+			this.nosWhoosh.setVolume( 0.2 );
+			this.nosWhoosh.play();
+
+		}
+
+		this.prevNosActive = na;
 
 		const absSpeed = THREE.MathUtils.clamp( Math.abs( speed ), 0, 1 );
 		// Only forward throttle counts as engine load. Brake/reverse (throttle < 0)

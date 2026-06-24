@@ -30,6 +30,8 @@ export class Camera {
 		this.smoothedDesired = new THREE.Vector3();
 		this.initialized = false;
 
+		this.nosShakeOffset = new THREE.Vector3();
+
 		const segments = 64;
 		const points = [];
 		for ( let i = 0; i <= segments; i ++ ) {
@@ -55,7 +57,22 @@ export class Camera {
 
 	}
 
-	update( dt, target, velocity ) {
+	_applyNosCameraShake( dt, nosIntensity ) {
+
+		const ni = THREE.MathUtils.clamp( nosIntensity ?? 0, 0, 1 );
+		this.nosShakeOffset.multiplyScalar( Math.exp( - dt * 13 ) );
+		this.nosShakeOffset.x += ( Math.random() - 0.5 ) * ni * 3.4 * dt;
+		this.nosShakeOffset.y += ( Math.random() - 0.5 ) * ni * 2.6 * dt;
+		this.nosShakeOffset.z += ( Math.random() - 0.5 ) * ni * 3.4 * dt;
+
+		const shakeLen = this.nosShakeOffset.length();
+		if ( shakeLen > 0.26 ) this.nosShakeOffset.multiplyScalar( 0.26 / shakeLen );
+
+		this.camera.position.add( this.nosShakeOffset );
+
+	}
+
+	update( dt, target, velocity, nosIntensity = 0 ) {
 
 		const radius = this.deadzoneRadius;
 		const radiusSq = radius * radius;
@@ -105,6 +122,8 @@ export class Camera {
 		this.debug.position.copy( this.smoothedDesired );
 		this.debug.position.y += 0.05;
 		this.debug.scale.set( radius, 1, radius );
+
+		this._applyNosCameraShake( dt, nosIntensity );
 
 	}
 

@@ -5,6 +5,9 @@ export class Controls {
 		this.keys = {};
 		this.x = 0;
 		this.z = 0;
+		this.nos = false;
+		/** Pointer / UI hold on the NOS button (see NosHud). */
+		this.nosUiHeld = false;
 
 		// Touch state
 		this.touchActive = false;
@@ -16,6 +19,11 @@ export class Controls {
 
 		window.addEventListener( 'keydown', ( e ) => this.keys[ e.code ] = true );
 		window.addEventListener( 'keyup', ( e ) => this.keys[ e.code ] = false );
+		window.addEventListener( 'blur', () => {
+
+			this.nosUiHeld = false;
+
+		} );
 
 		this.setupTouchUI();
 
@@ -120,6 +128,8 @@ export class Controls {
 
 		const gamepads = navigator.getGamepads();
 
+		let nos = false;
+
 		for ( const gp of gamepads ) {
 
 			if ( ! gp ) continue;
@@ -131,6 +141,10 @@ export class Controls {
 			const lt = gp.buttons[ 6 ] ? gp.buttons[ 6 ].value : 0;
 
 			if ( rt > 0.1 || lt > 0.1 ) z = rt - lt;
+
+			// RB — boost (NOS); avoids face buttons used for menus elsewhere.
+			const rb = gp.buttons[ 5 ];
+			if ( rb && rb.pressed ) nos = true;
 
 			break;
 
@@ -153,10 +167,21 @@ export class Controls {
 
 		}
 
+		if ( this.keys[ 'KeyX' ] ) nos = true;
+		if ( this.nosUiHeld ) nos = true;
+
 		this.x = x;
 		this.z = z;
+		this.nos = nos;
 
-		return { x, z, touchActive: this.touchActive };
+		return { x, z, touchActive: this.touchActive, nos };
+
+	}
+
+	/** Call from NOS HUD button pointer / keyboard hold. */
+	setNosUiHeld( held ) {
+
+		this.nosUiHeld = !! held;
 
 	}
 

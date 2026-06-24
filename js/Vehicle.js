@@ -14,6 +14,15 @@ const SPEED_SCALE = 12.5;
 const LINEAR_DAMP = 0.1;
 export const MAX_SPEED = 1.5;
 
+const NOS_MAX_MULT = 1.65;
+const NOS_DRIVE_MULT = 1.5;
+export const NOS_DURATION = 2.0;
+const NOS_WHEEL_LIFT = 0.065;
+/** Extra pitch (rad), subtracted from rotation.x target — nose-up during NOS. */
+const NOS_BODY_NOSE_UP = 0.24;
+const NOS_DRIFT_THRESHOLD = 0.48;
+const NOS_DRIFT_RECHARGE = 0.55;
+
 function lerpAngle( a, b, t ) {
 
 	let diff = b - a;
@@ -52,6 +61,13 @@ export class Vehicle {
 		this.inputZ = 0;
 
 		this.driftIntensity = 0;
+
+		this.nosTankRemaining = NOS_DURATION;
+		this.nosActive = false;
+		this.nosIntensity = 0;
+
+		this.wheelFLBaseY = 0;
+		this.wheelFRBaseY = 0;
 
 	}
 
@@ -92,6 +108,9 @@ export class Vehicle {
 
 		} );
 
+		if ( this.wheelFL ) this.wheelFLBaseY = this.wheelFL.position.y;
+		if ( this.wheelFR ) this.wheelFRBaseY = this.wheelFR.position.y;
+
 		return this.container;
 
 	}
@@ -100,6 +119,36 @@ export class Vehicle {
 
 		this.inputX = controlsInput.x;
 		this.inputZ = controlsInput.z;
+
+		const nosInput = controlsInput.nos === true;
+
+		const canBoost = this.nosTankRemaining > 0;
+		let nosOn = nosInput && canBoost;
+
+		if ( nosOn ) {
+
+			this.nosTankRemaining -= dt;
+
+			if ( this.nosTankRemaining <= 0 ) {
+
+				this.nosTankRemaining = 0;
+				nosOn = false;
+
+			}
+
+		}
+
+		this.nosActive = nosOn;
+
+		if ( this.nosActive ) {
+
+			this.nosIntensity = THREE.MathUtils.lerp( this.nosIntensity, 1, Math.min( 1, dt * 14 ) );
+
+		} else {
+
+			this.nosIntensity *= Math.exp( - dt * 9 );
+
+		}
 
 		if ( controlsInput.touchActive && ( this.inputX !== 0 || this.inputZ !== 0 ) ) {
 
@@ -112,7 +161,8 @@ export class Vehicle {
 			const cross = _forward.x * this.inputZ - _forward.z * this.inputX;
 			this.inputX = THREE.MathUtils.clamp( - cross * 2, - 1, 1 );
 
-			this.linearSpeed = THREE.MathUtils.lerp( this.linearSpeed, MAX_SPEED, dt * 1.5 );
+			const touchCap = this.nosActive ? MAX_SPEED * NOS_MAX_MULT : MAX_SPEED;
+			this.linearSpeed = THREE.MathUtils.lerp( this.linearSpeed, touchCap, dt * 1.5 );
 
 		} else {
 
@@ -139,7 +189,8 @@ export class Vehicle {
 
 			} else {
 
-				this.linearSpeed = THREE.MathUtils.lerp( this.linearSpeed, targetSpeed * MAX_SPEED, dt * 1.5 );
+				const forwardCap = MAX_SPEED * ( this.nosActive ? NOS_MAX_MULT : 1 );
+				this.linearSpeed = THREE.MathUtils.lerp( this.linearSpeed, targetSpeed * forwardCap, dt * 1.5 );
 
 			}
 
@@ -167,7 +218,8 @@ export class Vehicle {
 			_right.normalize();
 
 			const angvel = this.rigidBody.motionProperties.angularVelocity;
-			const drive = this.linearSpeed * 100 * dt;
+			let drive = this.linearSpeed * 100 * dt;
+			if ( this.nosActive ) drive *= NOS_DRIVE_MULT;
 
 			rigidBody.setAngularVelocity( this.physicsWorld, this.rigidBody, [
 				angvel[ 0 ] + _right.x * drive,
@@ -204,6 +256,9 @@ export class Vehicle {
 			this.linearSpeed = 0;
 			this.angularSpeed = 0;
 			this.acceleration = 0;
+			this.nosTankRemaining = NOS_DURATION;
+			this.nosActive = false;
+			this.nosIntensity = 0;
 			this.container.rotation.set( 0, 0, 0 );
 			this.container.quaternion.identity();
 
@@ -228,6 +283,20 @@ export class Vehicle {
 		this.driftIntensity = Math.abs( this.linearSpeed - this.acceleration ) +
 			( this.bodyNode ? Math.abs( this.bodyNode.rotation.z ) * 2 : 0 );
 
+		if ( this.driftIntensity > NOS_DRIFT_THRESHOLD ) {
+
+			const driftFactor = THREE.MathUtils.clamp(
+				( this.driftIntensity - NOS_DRIFT_THRESHOLD ) / ( 1.25 - NOS_DRIFT_THRESHOLD ),
+				0,
+				1
+			);
+			this.nosTankRemaining = Math.min(
+				NOS_DURATION,
+				this.nosTankRemaining + NOS_DRIFT_RECHARGE * dt * driftFactor
+			);
+
+		}
+
 	}
 
 	alignWithY( quaternion, newY ) {
@@ -245,9 +314,12 @@ export class Vehicle {
 
 		if ( ! this.bodyNode ) return;
 
+		let pitchTarget = -( this.linearSpeed - this.acceleration ) / 6;
+		if ( this.nosActive ) pitchTarget -= NOS_BODY_NOSE_UP;
+
 		this.bodyNode.rotation.x = lerpAngle(
 			this.bodyNode.rotation.x,
-			-( this.linearSpeed - this.acceleration ) / 6,
+			pitchTarget,
 			dt * 10
 		);
 
@@ -278,6 +350,22 @@ export class Vehicle {
 		if ( this.wheelFR ) {
 
 			this.wheelFR.rotation.y = lerpAngle( this.wheelFR.rotation.y, -this.inputX / 1.5, dt * 10 );
+
+		}
+
+		const liftTarget = this.nosActive ? NOS_WHEEL_LIFT : 0;
+
+		if ( this.wheelFL ) {
+
+			const ty = this.wheelFLBaseY + liftTarget;
+			this.wheelFL.position.y = THREE.MathUtils.lerp( this.wheelFL.position.y, ty, Math.min( 1, dt * 14 ) );
+
+		}
+
+		if ( this.wheelFR ) {
+
+			const ty = this.wheelFRBaseY + liftTarget;
+			this.wheelFR.position.y = THREE.MathUtils.lerp( this.wheelFR.position.y, ty, Math.min( 1, dt * 14 ) );
 
 		}
 
