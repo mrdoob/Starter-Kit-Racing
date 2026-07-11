@@ -14,6 +14,8 @@ export class Controls {
 		this.steerStartX = 0;
 		this.steerStartY = 0;
 
+		this._keyCDown = false;
+
 		window.addEventListener( 'keydown', ( e ) => this.keys[ e.code ] = true );
 		window.addEventListener( 'keyup', ( e ) => this.keys[ e.code ] = false );
 
@@ -156,7 +158,11 @@ export class Controls {
 		this.x = x;
 		this.z = z;
 
-		return { x, z, touchActive: this.touchActive };
+		const cDown = !! this.keys[ 'KeyC' ];
+		const cycleCamera = cDown && ! this._keyCDown;
+		this._keyCDown = cDown;
+
+		return { x, z, touchActive: this.touchActive, cycleCamera };
 
 	}
 

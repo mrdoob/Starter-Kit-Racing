@@ -53,6 +53,10 @@ export class Vehicle {
 
 		this.driftIntensity = 0;
 
+		/** World-space lateral acceleration along car right (XZ), for cockpit camera roll. */
+		this.lateralAccel = 0;
+		this._prevVLateral = 0;
+
 	}
 
 	init( model ) {
@@ -181,6 +185,24 @@ export class Vehicle {
 			const vel = this.rigidBody.motionProperties.linearVelocity;
 			this.sphereVel.set( vel[ 0 ], vel[ 1 ], vel[ 2 ] );
 
+			const vLat = this.sphereVel.dot( _right );
+			if ( dt > 1e-6 && dt < 0.2 ) {
+
+				this.lateralAccel = ( vLat - this._prevVLateral ) / dt;
+
+			} else {
+
+				this.lateralAccel = 0;
+
+			}
+
+			this._prevVLateral = vLat;
+
+		} else {
+
+			this.lateralAccel = 0;
+			this._prevVLateral = 0;
+
 		}
 
 		this.acceleration = THREE.MathUtils.lerp(
@@ -204,6 +226,8 @@ export class Vehicle {
 			this.linearSpeed = 0;
 			this.angularSpeed = 0;
 			this.acceleration = 0;
+			this.lateralAccel = 0;
+			this._prevVLateral = 0;
 			this.container.rotation.set( 0, 0, 0 );
 			this.container.quaternion.identity();
 
