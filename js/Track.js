@@ -308,7 +308,7 @@ export function buildTrack( scene, models, customCells, { compactDeco = false, s
 	// existing callers, who simply ignore this return value. npcConfigs
 	// is separate from the decorative parked trucks above — main.js uses
 	// it to spawn actual racing AI (same models, fresh instances).
-	const npcConfigs = customCells ? [] : NPC_TRUCKS.map( ( [ key, x, y, z, rotDeg ] ) => ( { key, x, y, z, rotDeg } ) );
+	const npcConfigs = NPC_TRUCKS.map( ( [ key, x, y, z, rotDeg ] ) => ( { key, x, y, z, rotDeg } ) );
 	return { trackGroup, trackPieceGroup, decoGroup, npcConfigs };
 
 }
