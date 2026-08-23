@@ -41,6 +41,8 @@ export class Vehicle {
 		this.spherePos = new THREE.Vector3( 3.5, 0.5, 5 );
 		this.sphereVel = new THREE.Vector3();
 		this.sphereRadius = 0.5; // overridable — AR floating-track/arena use a scaled-down sphere to match a shrunk track
+		this.spawnPos = null;
+		this.spawnAngle = 0;
 
 		this.rigidBody = null;
 		this.physicsWorld = null;
@@ -206,7 +208,8 @@ export class Vehicle {
 			_right.normalize();
 
 			const angvel = this.rigidBody.motionProperties.angularVelocity;
-			const drive = this.linearSpeed * 100 * dt;
+			const radiusRatio = 0.5 / Math.max( this.sphereRadius, 0.001 );
+			const drive = this.linearSpeed * 100 * dt * radiusRatio;
 
 			rigidBody.setAngularVelocity( this.physicsWorld, this.rigidBody, [
 				angvel[ 0 ] + _right.x * drive,
@@ -228,23 +231,29 @@ export class Vehicle {
 			dt
 		);
 
-		if ( this.spherePos.y < - 10 ) {
+		const respawnYLimit = ( this.spawnPos ? this.spawnPos[ 1 ] - 2.0 : - 10 );
+		if ( this.spherePos.y < respawnYLimit ) {
+
+			const rx = this.spawnPos ? this.spawnPos[ 0 ] : 3.5;
+			const ry = this.spawnPos ? this.spawnPos[ 1 ] : 0.5;
+			const rz = this.spawnPos ? this.spawnPos[ 2 ] : 5;
+			const rAngle = this.spawnAngle || 0;
 
 			if ( this.rigidBody ) {
 
-				rigidBody.setPosition( this.physicsWorld, this.rigidBody, [ 3.5, 0.5, 5 ], false );
+				rigidBody.setPosition( this.physicsWorld, this.rigidBody, [ rx, ry, rz ], false );
 				rigidBody.setLinearVelocity( this.physicsWorld, this.rigidBody, [ 0, 0, 0 ] );
 				rigidBody.setAngularVelocity( this.physicsWorld, this.rigidBody, [ 0, 0, 0 ] );
 
 			}
 
-			this.spherePos.set( 3.5, 0.5, 5 );
+			this.spherePos.set( rx, ry, rz );
 			this.sphereVel.set( 0, 0, 0 );
 			this.linearSpeed = 0;
 			this.angularSpeed = 0;
 			this.acceleration = 0;
-			this.container.rotation.set( 0, 0, 0 );
-			this.container.quaternion.identity();
+			this.container.rotation.set( 0, rAngle, 0 );
+			this.container.quaternion.setFromAxisAngle( _up, rAngle );
 
 		}
 

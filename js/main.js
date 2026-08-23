@@ -3127,6 +3127,8 @@ async function startARFloatingTrack( { arManager, vehicleKey, customText, flagIm
 		vehicle.sphereRadius = carRadius;
 		vehicle.rigidBody = sphereBody;
 		vehicle.physicsWorld = world;
+		vehicle.spawnPos = [ playerWorld.position[ 0 ], playerWorld.position[ 1 ], playerWorld.position[ 2 ] ];
+		vehicle.spawnAngle = playerWorld.angle;
 		vehicle.spherePos.set( playerWorld.position[ 0 ], playerWorld.position[ 1 ], playerWorld.position[ 2 ] );
 		vehicle.prevModelPos.set( playerWorld.position[ 0 ], 0, playerWorld.position[ 2 ] );
 		vehicle.container.rotation.y = playerWorld.angle;
@@ -3204,6 +3206,8 @@ async function startARFloatingTrack( { arManager, vehicleKey, customText, flagIm
 
 	};
 
+	const controls = new Controls();
+
 	return {
 
 		frameUpdate( dt ) {
@@ -3216,8 +3220,14 @@ async function startARFloatingTrack( { arManager, vehicleKey, customText, flagIm
 
 				} else if ( raceCtx ) {
 
-					const input = arManager.getDriveInput();
-					input.handbrake = arManager.getHandbrakeHold();
+					const kbInput = controls.update();
+					const arInput = arManager.getDriveInput();
+					const input = {
+						x: Math.abs( arInput.x ) > Math.abs( kbInput.x ) ? arInput.x : kbInput.x,
+						z: Math.abs( arInput.z ) > Math.abs( kbInput.z ) ? arInput.z : kbInput.z,
+						touchActive: kbInput.touchActive,
+						handbrake: kbInput.handbrake || arManager.getHandbrakeHold(),
+					};
 					updateVehicleAndFx( dt, input, raceCtx.ctx );
 					updateVehicleLights( raceCtx.vehicleLights, dt, raceCtx.arScale, raceCtx.vehicle.linearSpeed < -0.01 );
 
@@ -3496,6 +3506,8 @@ async function startARFloatingArena( { arManager, vehicleKey, customText, flagIm
 		vehicle.sphereRadius = carRadius;
 		vehicle.rigidBody = sphereBody;
 		vehicle.physicsWorld = world;
+		vehicle.spawnPos = [ playerWorld.position[ 0 ], playerWorld.position[ 1 ], playerWorld.position[ 2 ] ];
+		vehicle.spawnAngle = yaw2;
 		vehicle.spherePos.set( playerWorld.position[ 0 ], playerWorld.position[ 1 ], playerWorld.position[ 2 ] );
 		vehicle.prevModelPos.set( playerWorld.position[ 0 ], 0, playerWorld.position[ 2 ] );
 		vehicle.container.rotation.y = yaw2;
@@ -3561,6 +3573,8 @@ async function startARFloatingArena( { arManager, vehicleKey, customText, flagIm
 
 	};
 
+	const controls = new Controls();
+
 	return {
 
 		frameUpdate( dt ) {
@@ -3574,8 +3588,14 @@ async function startARFloatingArena( { arManager, vehicleKey, customText, flagIm
 
 				} else if ( phase === 'racing' && raceCtx ) {
 
-					const input = arManager.getDriveInput();
-					input.handbrake = arManager.getHandbrakeHold();
+					const kbInput = controls.update();
+					const arInput = arManager.getDriveInput();
+					const input = {
+						x: Math.abs( arInput.x ) > Math.abs( kbInput.x ) ? arInput.x : kbInput.x,
+						z: Math.abs( arInput.z ) > Math.abs( kbInput.z ) ? arInput.z : kbInput.z,
+						touchActive: kbInput.touchActive,
+						handbrake: kbInput.handbrake || arManager.getHandbrakeHold(),
+					};
 					updateVehicleAndFx( dt, input, raceCtx.ctx );
 					updateVehicleLights( raceCtx.vehicleLights, dt, raceCtx.arScale, raceCtx.vehicle.linearSpeed < -0.01 );
 
