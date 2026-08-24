@@ -13,7 +13,7 @@ export const TOTAL_RACE_LAPS = 3;
  * Race AI Update
  * Uses Pure Pursuit, Curvature Predictive Braking, Racing Line Offset & Stuck Recovery.
  */
-export function updateRaceAIDrivers( drivers, path, dt, racing, totalTime, playerVehicle = null ) {
+export function updateRaceAIDrivers( drivers, path, dt, racing, totalTime, playerVehicle = null, updateLightsFn = null ) {
 
 	if ( ! path || path.length < 2 ) return;
 
@@ -228,6 +228,11 @@ export function updateRaceAIDrivers( drivers, path, dt, racing, totalTime, playe
 
 		d.vehicle.update( dt, input );
 
+		if ( d.particles ) d.particles.update( dt, d.vehicle );
+		if ( d.driftMarks ) d.driftMarks.update( dt, d.vehicle );
+		if ( d.vehicleFlag ) d.vehicleFlag.updateFlutter( dt, Math.abs( d.vehicle.linearSpeed / 1.5 ) );
+		if ( d.vehicleLights && updateLightsFn ) updateLightsFn( d.vehicleLights, dt, d.radiusScale || 1.0, d.vehicle.linearSpeed < -0.01 );
+
 	} );
 
 }
@@ -236,7 +241,7 @@ export function updateRaceAIDrivers( drivers, path, dt, racing, totalTime, playe
  * Free-Roam / Hajwalah AI Update ("هجولة وتفحيط احترافي")
  * Features multi-state AI (CRUISING, DRIFTING, DONUTS, WALL_AVOIDANCE).
  */
-export function updateFreeRoamAIDrivers( drivers, dt, roadHalf ) {
+export function updateFreeRoamAIDrivers( drivers, dt, roadHalf, updateLightsFn = null ) {
 
 	const wanderRadius = roadHalf * 0.45;
 	const wallLimitRadius = roadHalf * 0.65;
@@ -400,6 +405,11 @@ export function updateFreeRoamAIDrivers( drivers, dt, roadHalf ) {
 		}
 
 		d.vehicle.update( dt, input );
+
+		if ( d.particles ) d.particles.update( dt, d.vehicle );
+		if ( d.driftMarks ) d.driftMarks.update( dt, d.vehicle );
+		if ( d.vehicleFlag ) d.vehicleFlag.updateFlutter( dt, Math.abs( d.vehicle.linearSpeed / 1.5 ) );
+		if ( d.vehicleLights && updateLightsFn ) updateLightsFn( d.vehicleLights, dt, d.radiusScale || 1.0, d.vehicle.linearSpeed < -0.01 );
 
 	} );
 

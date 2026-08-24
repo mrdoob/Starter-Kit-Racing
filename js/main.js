@@ -1752,17 +1752,10 @@ function computeGridPositions( vehicleSpawn, count ) {
 
 }
 
-function createAIDrivers( npcConfigs, gridSlots, models, scene, world, path, radius = 0.5 ) {
+function createAIDrivers( npcConfigs, gridSlots, models, scene, world, path, radius = 0.5, flagImage = null, mapParam = null ) {
 
 	if ( ! path || path.length < 2 ) return [];
 
-	// Average spacing between consecutive path points — used to convert
-	// each grid slot's "how far back from the line" distance directly
-	// into a starting path index, counting backward from index 0 (the
-	// finish line). This avoids a plain nearest-point spatial search,
-	// which could pick a point on the wrong side of the loop where the
-	// start and end come back close together near the finish line,
-	// sending that car off in the wrong direction from the start.
 	let totalLen = 0;
 	for ( let j = 0; j < path.length; j ++ ) {
 
@@ -1787,14 +1780,21 @@ function createAIDrivers( npcConfigs, gridSlots, models, scene, world, path, rad
 
 		const model = models[ cfg.key ] || models[ 'vehicle-truck-yellow' ];
 		const group = vehicle.init( model );
-		group.scale.setScalar( radius / 0.5 ); // matches the player's own visual scale — 1 for NORMAL mode (radius=0.5), shrunk in AR contexts
+		const radiusScale = radius / 0.5;
+		group.scale.setScalar( radiusScale ); // matches the player's own visual scale — 1 for NORMAL mode (radius=0.5), shrunk in AR contexts
 		scene.add( group );
+
+		const vehicleLights = addVehicleLights( group );
+		const vehicleFlag = addVehicleFlag( group, flagImage );
+		const particles = new SmokeTrails( scene, Math.max( radiusScale * 5, 0.02 ) );
+		const driftMarks = new DriftMarks( scene, mapParam );
 
 		const stepsBack = Math.round( slot.backDist / avgSpacing );
 		const bestIdx = ( ( path.length - stepsBack ) % path.length + path.length ) % path.length;
 
 		return {
 			vehicle, idx: bestIdx,
+			vehicleLights, vehicleFlag, particles, driftMarks, radiusScale,
 			lapsCompleted: 0,
 			finished: false,
 			finishTime: null,
@@ -1808,16 +1808,8 @@ function createAIDrivers( npcConfigs, gridSlots, models, scene, world, path, rad
 }
 
 // ─── Free-roam AI (random wandering "تفحيط" show, no fixed path) ──
-// Unlike the race AI above, these don't follow a track — they just pick
-// a random point inside the open arena, drive at it aggressively (full
-// throttle, no easing off for the turn — the opposite of the race AI's
-// cornering behavior), and pick a new random point every few seconds.
-// The sharp steering at speed naturally induces the same drift the
-// player's own car gets from Vehicle.js's physics, giving a "تفحيط
-// show" look. No collision avoidance — bumping the boundary wall or
-// another car is fine, even expected, for this look.
 
-function createFreeRoamAI( npcConfigs, models, scene, world, roadHalf ) {
+function createFreeRoamAI( npcConfigs, models, scene, world, roadHalf, flagImage = null, mapParam = null ) {
 
 	const spawnMargin = roadHalf * 0.5; // keep starting points away from the walls
 
@@ -1842,8 +1834,14 @@ function createFreeRoamAI( npcConfigs, models, scene, world, roadHalf ) {
 		const group = vehicle.init( model );
 		scene.add( group );
 
+		const vehicleLights = addVehicleLights( group );
+		const vehicleFlag = addVehicleFlag( group, flagImage );
+		const particles = new SmokeTrails( scene );
+		const driftMarks = new DriftMarks( scene, mapParam );
+
 		return {
 			vehicle,
+			vehicleLights, vehicleFlag, particles, driftMarks, radiusScale: 1.0,
 			target: { x, z }, // reached immediately, forces a fresh pick on frame 1
 			retargetTimer: 0,
 			stuckStrikes: 0,
@@ -2131,7 +2129,7 @@ function startNormalMode( { customCells, spawn, mapParam, customText, freeRoam, 
 		// other 3 for AI), free-roam has no such reservation.
 		aiDrivers = createFreeRoamAI(
 			[ { key: 'vehicle-truck-yellow' }, ...NPC_TRUCKS.map( ( [ key ] ) => ( { key } ) ) ],
-			models, scene, world, roadHalf
+			models, scene, world, roadHalf, flagImage, mapParam
 		);
 		freeRoamHalf = roadHalf;
 
@@ -2190,7 +2188,7 @@ function startNormalMode( { customCells, spawn, mapParam, customText, freeRoam, 
 
 			const gridSlots = computeGridPositions( spawn, 1 + npcConfigs.length );
 			gridSpawn = gridSlots[ 0 ];
-			aiDrivers = createAIDrivers( npcConfigs, gridSlots, models, scene, world, trackPath );
+			aiDrivers = createAIDrivers( npcConfigs, gridSlots, models, scene, world, trackPath, 0.5, flagImage, mapParam );
 
 		}
 
@@ -2316,11 +2314,11 @@ function startNormalMode( { customCells, spawn, mapParam, customText, freeRoam, 
 			updateVehicleAndFx( dt, input, ctx );
 			if ( isRace ) {
 
-				updateRaceAIDrivers( aiDrivers, trackPath, dt, racing, raceState.totalTime, vehicle );
+				updateRaceAIDrivers( aiDrivers, trackPath, dt, racing, raceState.totalTime, vehicle, updateVehicleLights );
 
 			} else {
 
-				updateFreeRoamAIDrivers( aiDrivers, dt, freeRoamHalf );
+				updateFreeRoamAIDrivers( aiDrivers, dt, freeRoamHalf, updateVehicleLights );
 
 			}
 			updateVehicleLights( vehicleLights, dt, 1, vehicle.linearSpeed < -0.01 );
