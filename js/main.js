@@ -3082,15 +3082,11 @@ async function startARFloatingTrack( { arManager, vehicleKey, customText, flagIm
 		// its own diameter to stay contained.
 		const trackCarBoost = 1;
 
-	// Gravity scaled down with the track — real 9.81 m/s² acting on
-		// a sphere shrunk to AR-tabletop size is a huge force relative
-		// to its own tiny size, causing violent jitter/bouncing instead
-		// of the car settling naturally onto the track.
-		const world = createPhysicsWorld( arTransform.scale );
+		const world = createPhysicsWorld( 1.0 );
 		buildWallColliders( world, null, null, arTransform, trackCarBoost * 1.5 );
 
 		const groundHalfY = Math.max( 0.01 * arTransform.scale, 0.002 );
-		const groundXf = applyArTransform( [ bounds.centerX, - 0.125, bounds.centerZ ], [ 0, 0, 0, 1 ], arTransform );
+		const groundXf = applyArTransform( [ bounds.centerX, - 0.5, bounds.centerZ ], [ 0, 0, 0, 1 ], arTransform );
 		rigidBody.create( world, {
 			shape: box.create( { halfExtents: [ bounds.halfWidth * arTransform.scale, groundHalfY, bounds.halfDepth * arTransform.scale ] } ),
 			motionType: MotionType.STATIC,
@@ -3426,13 +3422,10 @@ async function startARFloatingArena( { arManager, vehicleKey, customText, flagIm
 		arenaGroup.remove( previewContainer );
 		previewAI.forEach( ( d ) => arenaGroup.remove( d.model ) );
 
-		// Gravity scaled down with the arena — see the floating track's
-		// own comment on why (real 9.81 m/s² on a tiny sphere causes
-		// violent jitter instead of the car settling naturally).
-		const world = createPhysicsWorld( arTransform.scale );
+		const world = createPhysicsWorld( 1.0 );
 
 		const groundHalfY = Math.max( 0.01 * arTransform.scale, 0.002 );
-		const groundXf = applyArTransform( [ 0, - 0.125, 0 ], [ 0, 0, 0, 1 ], arTransform );
+		const groundXf = applyArTransform( [ 0, 0, 0 ], [ 0, 0, 0, 1 ], arTransform );
 		rigidBody.create( world, {
 			shape: box.create( { halfExtents: [ PAD_HALF * arTransform.scale, groundHalfY, PAD_HALF * arTransform.scale ] } ),
 			motionType: MotionType.STATIC,
